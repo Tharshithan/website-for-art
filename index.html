@@ -382,7 +382,8 @@
           return;
         }
         setFormErrors({});
-        const normalizedArtwork = { ...editingArtwork, image: editingArtwork.image.trim() };
+        const normalizedImage = (editingArtwork.image || '').trim();
+        const normalizedArtwork = { ...editingArtwork, image: normalizedImage };
 
         if (editingArtwork.id) {
           const now = Date.now();
