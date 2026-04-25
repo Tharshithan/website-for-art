@@ -299,7 +299,7 @@
           imgbbFetchGallery().then(imgs => {
             if (imgs && imgs.length > 0) {
               const now = Date.now();
-              setArtworks(imgs.map((img, i) => ({ ...img, imageVersion: now + i })));
+              setArtworks(imgs.map((img) => ({ ...img, imageVersion: now })));
             }
           }).catch(() => {});
         }
@@ -311,7 +311,7 @@
           const imgs = await imgbbFetchGallery();
           if (imgs && imgs.length > 0) {
             const now = Date.now();
-            setArtworks(imgs.map((img, i) => ({ ...img, imageVersion: now + i })));
+            setArtworks(imgs.map((img) => ({ ...img, imageVersion: now })));
             showToast(`Synced ${imgs.length} image(s) from imgbb`);
           } else {
             showToast(
@@ -386,12 +386,12 @@
 
         if (editingArtwork.id) {
           const now = Date.now();
-          setArtworks(artworks.map((a, i) => {
+          setArtworks(artworks.map((a) => {
             if (a.id !== editingArtwork.id) return a;
             const imageChanged = a.image !== normalizedArtwork.image;
             return {
               ...normalizedArtwork,
-              imageVersion: imageChanged ? (now + i) : (normalizedArtwork.imageVersion || a.imageVersion || now + i),
+              imageVersion: imageChanged ? now : (normalizedArtwork.imageVersion || a.imageVersion || now),
             };
           }));
         } else {
