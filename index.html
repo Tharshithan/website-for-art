@@ -130,13 +130,19 @@
     } = Lucide;
 
     // ─── imgbb Integration ────────────────────────────────────────────────────────
-    // 1. Get a FREE API key at https://api.imgbb.com/ (sign in → API → get key)
-    // 2. Paste it below.  Everything else is automatic.
-    const IMGBB_API_KEY = ''; // ← your imgbb API key here
+    // API key can be set via the Admin Panel → Settings without editing source code.
+    // Optionally hard-code a fallback key here (leave empty to rely on the UI setting).
+    const IMGBB_API_KEY_FALLBACK = ''; // ← optional hard-coded fallback key
     const IMGBB_USERNAME = 'tharshithan-thar'; // your imgbb username
 
+    // Read the API key at runtime from localStorage (set via admin panel) or the fallback above.
+    function getImgbbApiKey() {
+      return localStorage.getItem('imgbb_api_key') || IMGBB_API_KEY_FALLBACK;
+    }
+
     async function imgbbUploadFile(file) {
-      if (!IMGBB_API_KEY) throw new Error('No imgbb API key set. Add your key to IMGBB_API_KEY.');
+      const key = getImgbbApiKey();
+      if (!key) throw new Error('No imgbb API key set. Enter your key in Admin Panel → Settings.');
       const toBase64 = f => new Promise((res, rej) => {
         const r = new FileReader();
         r.onload = () => res(r.result.split(',')[1]);
@@ -145,21 +151,23 @@
       });
       const b64 = await toBase64(file);
       const body = new FormData();
-      body.append('key', IMGBB_API_KEY);
+      body.append('key', key);
       body.append('image', b64);
       body.append('name', file.name.replace(/\.[^.]+$/, ''));
       const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body });
       if (!res.ok) throw new Error('imgbb upload failed (' + res.status + ')');
       const json = await res.json();
+      if (!json.success) throw new Error(json.error?.message || 'imgbb upload failed');
       return { url: json.data.url, deleteUrl: json.data.delete_url, id: json.data.id };
     }
 
     async function imgbbFetchGallery() {
+      const key = getImgbbApiKey();
       // Primary: authenticated account images API
-      if (IMGBB_API_KEY) {
+      if (key) {
         try {
           const res = await fetch(
-            `https://api.imgbb.com/1/account/images?key=${encodeURIComponent(IMGBB_API_KEY)}&page=1&per_page=200`
+            `https://api.imgbb.com/1/account/images?key=${encodeURIComponent(key)}&page=1&per_page=200`
           );
           if (res.ok) {
             const json = await res.json();
@@ -201,6 +209,8 @@
 
     function buildImageSrc(imageUrl, cacheBuster) {
       if (!imageUrl) return imageUrl;
+      // Never modify data: URLs — appending query params breaks them.
+      if (imageUrl.startsWith('data:')) return imageUrl;
       if (!cacheBuster) return imageUrl;
       try {
         const parsed = new URL(imageUrl);
@@ -250,15 +260,34 @@
 
     function App() {
       const [artworks, setArtworks] = useState(() => {
-        const VERSION = 'v4'; // bumped: added placeholder images to default artworks
+        const VERSION = 'v5'; // bumped: migrate legacy base64 images out of localStorage
         const savedVersion = localStorage.getItem('marries_gallery_art_version');
         if (savedVersion !== VERSION) {
+          // On version change keep existing artwork metadata but strip any inline
+          // base64 images — they balloon localStorage and prevent future saves.
+          const prev = localStorage.getItem('marries_gallery_art');
+          if (prev) {
+            try {
+              const parsed = JSON.parse(prev);
+              const migrated = parsed.map(a => ({
+                ...a,
+                // Replace base64 data URLs with empty string so the URL field shows blank
+                image: (a.image && a.image.startsWith('data:')) ? '' : (a.image || ''),
+              }));
+              localStorage.setItem('marries_gallery_art', JSON.stringify(migrated));
+              localStorage.setItem('marries_gallery_art_version', VERSION);
+              return migrated;
+            } catch (_) {}
+          }
           localStorage.removeItem('marries_gallery_art');
           localStorage.setItem('marries_gallery_art_version', VERSION);
           return DEFAULT_ARTWORKS;
         }
         const saved = localStorage.getItem('marries_gallery_art');
-        return saved ? JSON.parse(saved) : DEFAULT_ARTWORKS;
+        if (saved) {
+          try { return JSON.parse(saved); } catch (_) {}
+        }
+        return DEFAULT_ARTWORKS;
       });
 
       const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -274,6 +303,7 @@
       const [formErrors, setFormErrors] = useState({});
       const [isUploading, setIsUploading] = useState(false);
       const [imgbbSyncing, setImgbbSyncing] = useState(false);
+      const [imgbbApiKeyInput, setImgbbApiKeyInput] = useState(() => localStorage.getItem('imgbb_api_key') || '');
 
       // Cursor state
       const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -289,7 +319,21 @@
       }, []);
 
       useEffect(() => {
-        localStorage.setItem('marries_gallery_art', JSON.stringify(artworks));
+        try {
+          localStorage.setItem('marries_gallery_art', JSON.stringify(artworks));
+        } catch (e) {
+          // QuotaExceededError — storage full, usually caused by stale large data
+          if (e && (e.name === 'QuotaExceededError' || e.code === 22)) {
+            // Remove any artwork that still has a base64 image embedded and retry
+            try {
+              const slim = artworks.map(a => ({
+                ...a,
+                image: (a.image && a.image.startsWith('data:')) ? '' : (a.image || ''),
+              }));
+              localStorage.setItem('marries_gallery_art', JSON.stringify(slim));
+            } catch (_) {}
+          }
+        }
       }, [artworks]);
 
       // On mount: try to sync gallery from imgbb if no local data exists
@@ -315,9 +359,9 @@
             showToast(`Synced ${imgs.length} image(s) from imgbb`);
           } else {
             showToast(
-              IMGBB_API_KEY
+              getImgbbApiKey()
                 ? 'No images found on imgbb account.'
-                : 'Set your imgbb API key (IMGBB_API_KEY) to sync.',
+                : 'Enter your imgbb API key in Admin Panel → Settings to sync.',
               'error'
             );
           }
@@ -418,8 +462,8 @@
       const handleImgbbFileUpload = async (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
-        if (!IMGBB_API_KEY) {
-          showToast('Add your imgbb API key (IMGBB_API_KEY) in the code to enable uploads.', 'error');
+        if (!getImgbbApiKey()) {
+          showToast('Enter your imgbb API key in Admin Panel → Settings to enable uploads.', 'error');
           return;
         }
         setIsUploading(true);
@@ -427,12 +471,23 @@
           const { url } = await imgbbUploadFile(file);
           setEditingArtwork(prev => ({ ...prev, image: url }));
           setFormErrors(prev => ({ ...prev, image: undefined }));
-          showToast('Image uploaded to imgbb');
+          showToast('Image uploaded to imgbb ✓');
         } catch (err) {
           showToast('Upload failed: ' + err.message, 'error');
         } finally {
           setIsUploading(false);
           e.target.value = '';
+        }
+      };
+
+      const saveImgbbApiKey = () => {
+        const trimmed = imgbbApiKeyInput.trim();
+        if (trimmed) {
+          localStorage.setItem('imgbb_api_key', trimmed);
+          showToast('imgbb API key saved ✓');
+        } else {
+          localStorage.removeItem('imgbb_api_key');
+          showToast('imgbb API key cleared');
         }
       };
 
@@ -773,6 +828,28 @@
                   onClick: handleLogout,
                   className: "w-full flex items-center justify-center gap-2 py-3 text-[#9a9080] text-[0.65rem] tracking-widest uppercase hover:text-white transition-colors"
                 }, React.createElement(LogOut, { size: 16 }), " Logout")
+              ),
+              // imgbb API key settings
+              React.createElement('div', { className: "p-4 border-t border-[rgba(201,168,76,0.12)]" },
+                React.createElement('p', { className: "text-[0.6rem] tracking-[0.2em] uppercase text-[#9a9080] mb-2" }, "imgbb API Key"),
+                React.createElement('p', { className: "text-[0.55rem] text-[#9a9080] mb-3 leading-relaxed opacity-70" },
+                  "Get a free key at ",
+                  React.createElement('a', { href: "https://api.imgbb.com/", target: "_blank", rel: "noopener", className: "text-[#c9a84c] underline" }, "api.imgbb.com"),
+                  " then paste it below to enable file uploads."
+                ),
+                React.createElement('div', { className: "flex gap-2" },
+                  React.createElement('input', {
+                    type: "password",
+                    value: imgbbApiKeyInput,
+                    onChange: (e) => setImgbbApiKeyInput(e.target.value),
+                    placeholder: getImgbbApiKey() ? "Key saved ✓" : "Paste API key…",
+                    className: "flex-1 bg-[#161410] border border-[rgba(201,168,76,0.18)] px-3 py-2 text-[0.7rem] text-[#f0ead8] outline-none focus:border-[#c9a84c] transition-colors min-w-0"
+                  }),
+                  React.createElement('button', {
+                    onClick: saveImgbbApiKey,
+                    className: "px-3 py-2 bg-[#c9a84c] text-[#0a0908] text-[0.6rem] tracking-wider uppercase hover:bg-[#e8c97a] transition-colors shrink-0"
+                  }, "Save")
+                )
               )
             ),
             React.createElement('div', { className: "flex-1 p-12 overflow-y-auto relative" },
