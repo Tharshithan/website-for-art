@@ -388,10 +388,14 @@
           const now = Date.now();
           setArtworks(artworks.map((a) => {
             if (a.id !== editingArtwork.id) return a;
-            const imageChanged = a.image !== normalizedArtwork.image;
+            const currentImage = (a.image || '').trim();
+            const imageChanged = currentImage !== normalizedArtwork.image;
+            const imageVersion = imageChanged
+              ? now
+              : (normalizedArtwork.imageVersion || a.imageVersion || now);
             return {
               ...normalizedArtwork,
-              imageVersion: imageChanged ? now : (normalizedArtwork.imageVersion || a.imageVersion || now),
+              imageVersion,
             };
           }));
         } else {
