@@ -198,6 +198,19 @@
       } catch (_) {}
       return null; // could not reach imgbb
     }
+
+    function buildImageSrc(imageUrl, cacheBuster) {
+      if (!imageUrl) return imageUrl;
+      if (!cacheBuster) return imageUrl;
+      try {
+        const parsed = new URL(imageUrl);
+        parsed.searchParams.set('v', String(cacheBuster));
+        return parsed.toString();
+      } catch (_) {
+        const joiner = imageUrl.includes('?') ? '&' : '?';
+        return `${imageUrl}${joiner}v=${encodeURIComponent(cacheBuster)}`;
+      }
+    }
     // ─────────────────────────────────────────────────────────────────────────────
 
     const DEFAULT_ARTWORKS = [
@@ -285,7 +298,8 @@
         if (!hasLocalData || JSON.parse(hasLocalData).every(a => !a.image)) {
           imgbbFetchGallery().then(imgs => {
             if (imgs && imgs.length > 0) {
-              setArtworks(imgs);
+              const now = Date.now();
+              setArtworks(imgs.map((img, i) => ({ ...img, imageVersion: now + i })));
             }
           }).catch(() => {});
         }
@@ -296,7 +310,8 @@
         try {
           const imgs = await imgbbFetchGallery();
           if (imgs && imgs.length > 0) {
-            setArtworks(imgs);
+            const now = Date.now();
+            setArtworks(imgs.map((img, i) => ({ ...img, imageVersion: now + i })));
             showToast(`Synced ${imgs.length} image(s) from imgbb`);
           } else {
             showToast(
@@ -367,11 +382,21 @@
           return;
         }
         setFormErrors({});
+        const normalizedArtwork = { ...editingArtwork, image: editingArtwork.image.trim() };
 
         if (editingArtwork.id) {
-          setArtworks(artworks.map(a => a.id === editingArtwork.id ? editingArtwork : a));
+          const now = Date.now();
+          setArtworks(artworks.map((a, i) => {
+            if (a.id !== editingArtwork.id) return a;
+            const imageChanged = a.image !== normalizedArtwork.image;
+            return {
+              ...normalizedArtwork,
+              imageVersion: imageChanged ? (now + i) : (normalizedArtwork.imageVersion || a.imageVersion || now + i),
+            };
+          }));
         } else {
-          const newArt = { ...editingArtwork, id: Date.now() };
+          const now = Date.now();
+          const newArt = { ...normalizedArtwork, id: now, imageVersion: now };
           setArtworks([...artworks, newArt]);
         }
         setEditingArtwork(null);
@@ -565,7 +590,7 @@
                 },
                   React.createElement('div', { className: "aspect-[4/3] overflow-hidden relative" },
                     art.image
-                      ? React.createElement('img', { src: art.image, alt: art.title, className: "w-full h-full object-cover brightness-90 group-hover:brightness-100 group-hover:scale-110 transition-all duration-700" })
+                      ? React.createElement('img', { src: buildImageSrc(art.image, art.imageVersion), alt: art.title, className: "w-full h-full object-cover brightness-90 group-hover:brightness-100 group-hover:scale-110 transition-all duration-700" })
                       : React.createElement('div', { className: "w-full h-full bg-[#161410] flex flex-col items-center justify-center text-[#9a9080]" },
                           React.createElement(ImageIcon, { size: 48, className: "opacity-20 mb-2" }),
                           React.createElement('p', { className: "text-[0.65rem] tracking-widest uppercase opacity-40" }, "Image Coming Soon")
@@ -718,7 +743,7 @@
                   },
                     React.createElement(GripVertical, { className: "text-[#9a9080] cursor-grab active:cursor-grabbing shrink-0", size: 14 }),
                     art.image
-                      ? React.createElement('img', { src: art.image, className: "w-10 h-10 object-cover shrink-0" })
+                      ? React.createElement('img', { src: buildImageSrc(art.image, art.imageVersion), className: "w-10 h-10 object-cover shrink-0" })
                       : React.createElement('div', { className: "w-10 h-10 bg-[#161410] flex items-center justify-center shrink-0" },
                           React.createElement(ImageIcon, { size: 16, className: "text-[#9a9080] opacity-40" })
                         ),
@@ -753,7 +778,7 @@
                   React.createElement('div', null,
                     React.createElement('label', { className: "block text-[0.65rem] tracking-[0.2em] uppercase text-[#9a9080] mb-3" }, "Artwork Image ", React.createElement('span', { className: "text-red-500" }, "*")),
                     React.createElement('div', { className: `aspect-video bg-[#161410] border border-dashed ${formErrors.image ? 'border-red-700' : 'border-[rgba(201,168,76,0.18)]'} relative group overflow-hidden` },
-                      editingArtwork.image ? React.createElement('img', { src: editingArtwork.image, className: "w-full h-full object-cover", onError: (e) => { e.target.style.display='none'; } }) : React.createElement('div', { className: "absolute inset-0 flex flex-col items-center justify-center text-[#9a9080]" },
+                      editingArtwork.image ? React.createElement('img', { src: buildImageSrc(editingArtwork.image, editingArtwork.imageVersion), className: "w-full h-full object-cover", onError: (e) => { e.target.style.display='none'; } }) : React.createElement('div', { className: "absolute inset-0 flex flex-col items-center justify-center text-[#9a9080]" },
                         React.createElement(ImageIcon, { size: 40, className: "mb-2 opacity-20" }),
                         React.createElement('p', { className: "text-xs" }, "Image Preview")
                       )
@@ -862,7 +887,7 @@
               React.createElement('button', { onClick: () => setSelectedArtwork(null), className: "absolute top-6 right-6 text-[#9a9080] hover:text-[#c9a84c] z-10" }, React.createElement(X, { size: 24 })),
               React.createElement('div', { className: "aspect-square md:aspect-auto overflow-hidden" },
                 selectedArtwork.image
-                  ? React.createElement('img', { src: selectedArtwork.image, alt: selectedArtwork.title, className: "w-full h-full object-cover" })
+                  ? React.createElement('img', { src: buildImageSrc(selectedArtwork.image, selectedArtwork.imageVersion), alt: selectedArtwork.title, className: "w-full h-full object-cover" })
                   : React.createElement('div', { className: "w-full h-full min-h-[300px] bg-[#161410] flex flex-col items-center justify-center text-[#9a9080]" },
                       React.createElement(ImageIcon, { size: 64, className: "opacity-20 mb-3" }),
                       React.createElement('p', { className: "text-[0.65rem] tracking-widest uppercase opacity-40" }, "Image Coming Soon")
