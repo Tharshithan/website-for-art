@@ -209,7 +209,7 @@
 
     function buildImageSrc(imageUrl, cacheBuster) {
       if (!imageUrl) return imageUrl;
-      // Never modify data: URLs — appending query params breaks them.
+      // Never modify data URLs — appending query params breaks them.
       if (imageUrl.startsWith('data:')) return imageUrl;
       if (!cacheBuster) return imageUrl;
       try {
@@ -277,7 +277,7 @@
               localStorage.setItem('marries_gallery_art', JSON.stringify(migrated));
               localStorage.setItem('marries_gallery_art_version', VERSION);
               return migrated;
-            } catch (_) {}
+            } catch (e) { console.error('Gallery migration failed:', e); }
           }
           localStorage.removeItem('marries_gallery_art');
           localStorage.setItem('marries_gallery_art_version', VERSION);
@@ -285,7 +285,7 @@
         }
         const saved = localStorage.getItem('marries_gallery_art');
         if (saved) {
-          try { return JSON.parse(saved); } catch (_) {}
+          try { return JSON.parse(saved); } catch (e) { console.error('Failed to parse saved gallery:', e); }
         }
         return DEFAULT_ARTWORKS;
       });
@@ -331,7 +331,7 @@
                 image: (a.image && a.image.startsWith('data:')) ? '' : (a.image || ''),
               }));
               localStorage.setItem('marries_gallery_art', JSON.stringify(slim));
-            } catch (_) {}
+            } catch (retryErr) { console.error('Gallery save failed (storage full):', retryErr); }
           }
         }
       }, [artworks]);
@@ -839,7 +839,7 @@
                 ),
                 React.createElement('div', { className: "flex gap-2" },
                   React.createElement('input', {
-                    type: "password",
+                    type: "text",
                     value: imgbbApiKeyInput,
                     onChange: (e) => setImgbbApiKeyInput(e.target.value),
                     placeholder: getImgbbApiKey() ? "Key saved ✓" : "Paste API key…",
