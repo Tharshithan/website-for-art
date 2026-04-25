@@ -5,34 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MARIE Gallery | Rajkumary Ratnam (Marie)</title>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Cinzel:wght@400;600;700&family=Raleway:wght@300;400;500&display=swap" rel="stylesheet">
-  <script src="https://cdn.tailwindcss.com"></script>
   <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Raleway', 'sans-serif'],
-            serif: ['Cormorant Garamond', 'serif'],
-            display: ['Cinzel', 'serif'],
-          },
-          colors: {
-            gold: {
-              DEFAULT: '#c9a84c',
-              light: '#e8c97a',
-              dim: '#8a6d2f',
+    window.tailwind = {
+      config: {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Raleway', 'sans-serif'],
+              serif: ['Cormorant Garamond', 'serif'],
+              display: ['Cinzel', 'serif'],
             },
-            bg: '#0a0908',
-            bg2: '#0f0e0c',
-            bg3: '#161410',
-            text: '#f0ead8',
-            'text-dim': '#9a9080',
-            cream: '#f5edd8',
-            border: 'rgba(201,168,76,0.18)',
+            colors: {
+              gold: {
+                DEFAULT: '#c9a84c',
+                light: '#e8c97a',
+                dim: '#8a6d2f',
+              },
+              bg: '#0a0908',
+              bg2: '#0f0e0c',
+              bg3: '#161410',
+              text: '#f0ead8',
+              'text-dim': '#9a9080',
+              cream: '#f5edd8',
+              border: 'rgba(201,168,76,0.18)',
+            }
           }
         }
       }
     }
   </script>
+  <script src="https://cdn.tailwindcss.com"></script>
   <style type="text/css">
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
 
@@ -205,7 +207,7 @@
         category: "Watercolour",
         description: "A vibrant watercolour study of a peacock in full display, capturing the iridescent blues and greens of its magnificent plumage with expressive brushwork and a lively paint-splash technique.",
         price: "£1,200",
-        image: '',
+        image: 'https://images.unsplash.com/photo-1548550023-2bdb3c5beed7?w=800&q=80&auto=format&fit=crop',
       },
       {
         id: 2,
@@ -213,7 +215,7 @@
         category: "Pastel & Charcoal",
         description: "A dramatic nocturnal composition rendered in white chalk and pastel on dark paper. A domed temple rises from the mist, glowing against a deep, storm-laden sky, evoking mystery and transcendence.",
         price: "£1,650",
-        image: '',
+        image: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80&auto=format&fit=crop',
       },
       {
         id: 3,
@@ -221,7 +223,7 @@
         category: "Watercolour",
         description: "Bare winter trees silhouetted against a luminous wash of pinks, purples and blues. A deeply atmospheric landscape that captures the quiet magic of the forest in fading light.",
         price: "£980",
-        image: '',
+        image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&q=80&auto=format&fit=crop',
       },
       {
         id: 4,
@@ -229,13 +231,13 @@
         category: "Photography",
         description: "A grey heron stands tall amid fallen autumn leaves and golden bamboo, captured in a moment of stillness. A testament to the quiet beauty of urban wildlife in the English countryside.",
         price: "£350",
-        image: '',
+        image: 'https://images.unsplash.com/photo-1618606370369-2e7af7ac8e2c?w=800&q=80&auto=format&fit=crop',
       }
     ];
 
     function App() {
       const [artworks, setArtworks] = useState(() => {
-        const VERSION = 'v3'; // bumped: switched from base64 to imgbb URLs
+        const VERSION = 'v4'; // bumped: added placeholder images to default artworks
         const savedVersion = localStorage.getItem('marries_gallery_art_version');
         if (savedVersion !== VERSION) {
           localStorage.removeItem('marries_gallery_art');
@@ -562,7 +564,12 @@
                   className: "bg-[#0f0e0c] border border-transparent hover:border-[rgba(201,168,76,0.18)] transition-all duration-500 group cursor-pointer"
                 },
                   React.createElement('div', { className: "aspect-[4/3] overflow-hidden relative" },
-                    React.createElement('img', { src: art.image, alt: art.title, className: "w-full h-full object-cover brightness-90 group-hover:brightness-100 group-hover:scale-110 transition-all duration-700" }),
+                    art.image
+                      ? React.createElement('img', { src: art.image, alt: art.title, className: "w-full h-full object-cover brightness-90 group-hover:brightness-100 group-hover:scale-110 transition-all duration-700" })
+                      : React.createElement('div', { className: "w-full h-full bg-[#161410] flex flex-col items-center justify-center text-[#9a9080]" },
+                          React.createElement(ImageIcon, { size: 48, className: "opacity-20 mb-2" }),
+                          React.createElement('p', { className: "text-[0.65rem] tracking-widest uppercase opacity-40" }, "Image Coming Soon")
+                        ),
                     React.createElement('div', { className: "absolute inset-0 bg-gradient-to-t from-[rgba(10,9,8,0.95)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-6" },
                       React.createElement('span', { className: "text-[0.65rem] tracking-[0.3em] uppercase text-[#c9a84c] border border-[#c9a84c] px-4 py-2" }, "View Details")
                     )
@@ -710,7 +717,11 @@
                     onClick: () => { setEditingArtwork(art); setFormErrors({}); }
                   },
                     React.createElement(GripVertical, { className: "text-[#9a9080] cursor-grab active:cursor-grabbing shrink-0", size: 14 }),
-                    React.createElement('img', { src: art.image, className: "w-10 h-10 object-cover shrink-0" }),
+                    art.image
+                      ? React.createElement('img', { src: art.image, className: "w-10 h-10 object-cover shrink-0" })
+                      : React.createElement('div', { className: "w-10 h-10 bg-[#161410] flex items-center justify-center shrink-0" },
+                          React.createElement(ImageIcon, { size: 16, className: "text-[#9a9080] opacity-40" })
+                        ),
                     React.createElement('div', { className: "text-left overflow-hidden" },
                       React.createElement('p', { className: "text-[#f5edd8] text-[0.7rem] truncate" }, art.title),
                       React.createElement('p', { className: "text-[#c9a84c] text-[0.6rem]" }, art.price)
@@ -850,7 +861,12 @@
             },
               React.createElement('button', { onClick: () => setSelectedArtwork(null), className: "absolute top-6 right-6 text-[#9a9080] hover:text-[#c9a84c] z-10" }, React.createElement(X, { size: 24 })),
               React.createElement('div', { className: "aspect-square md:aspect-auto overflow-hidden" },
-                React.createElement('img', { src: selectedArtwork.image, alt: selectedArtwork.title, className: "w-full h-full object-cover" })
+                selectedArtwork.image
+                  ? React.createElement('img', { src: selectedArtwork.image, alt: selectedArtwork.title, className: "w-full h-full object-cover" })
+                  : React.createElement('div', { className: "w-full h-full min-h-[300px] bg-[#161410] flex flex-col items-center justify-center text-[#9a9080]" },
+                      React.createElement(ImageIcon, { size: 64, className: "opacity-20 mb-3" }),
+                      React.createElement('p', { className: "text-[0.65rem] tracking-widest uppercase opacity-40" }, "Image Coming Soon")
+                    )
               ),
               React.createElement('div', { className: "p-12 flex flex-col justify-center" },
                 React.createElement('p', { className: "text-[0.65rem] tracking-[0.3em] uppercase text-[#8a6d2f] mb-4" }, selectedArtwork.category),
